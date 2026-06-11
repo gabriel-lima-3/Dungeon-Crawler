@@ -18,17 +18,28 @@
 #else
     #include <termios.h>
     #include <unistd.h>
-    char meuGetch() {
+char meuGetch() {
         struct termios oldt, newt;
         char ch;
         tcgetattr(STDIN_FILENO, &oldt);
         newt = oldt;
         newt.c_lflag &= ~(ICANON | ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-        ch = getchar();
+
+        // limpa lixo residual do buffer
+        while (read(STDIN_FILENO, &ch, 1) == 1) {
+            struct timeval tv = {0, 0};
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(STDIN_FILENO, &fds);
+            if (select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) <= 0) break;
+        }
+
+        read(STDIN_FILENO, &ch, 1);
         tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         return ch;
     }
+
     void limparTela() {
         printf("\033[H\033[J");
     }
@@ -79,8 +90,9 @@ char direcaoJogador = 'v';
 int vidas = 3;
 int temChave = 0;
 int armaEscolhida = ARMA_NENHUMA;
-int faseAtual = 0;      
-int faseConcluida = 0;  
+int faseAtual = 0;
+int faseConcluida = 0;
+int skipFase = 0;
 
 // ============================================================
 // UTILITARIOS
@@ -137,7 +149,7 @@ void inicializarAndar1() {
 
 //IA agilizou
 void inicializarAndar2(){
-   
+
 linhasAtual = 15;
     colunasAtual = 15;
     montarBordas();
@@ -191,7 +203,7 @@ mapa[7][7] = ESPINHO;
 mapa[7][8] = ESPINHO;
 
 //Inimigo 1- IA agilizar
-mapa[10][7] = INIMIGO_X;  
+mapa[10][7] = INIMIGO_X;
 
     jogadorX = 1;
     jogadorY = 1;
@@ -289,12 +301,12 @@ void atacarCelula(int y, int x) {
     if (mapa[y][x] == CAIXA || mapa[y][x] == INIMIGO_X || mapa[y][x] == INIMIGO_Y) {
         mapa[y][x] = VAZIO;
     }
-    
+
     //IA
     if (mapa[y][x] == CAIXA || mapa[y][x] == INIMIGO_X || mapa[y][x] == INIMIGO_Y || mapa[y][x] == BOSS) {
     mapa[y][x] = VAZIO;
 }
-    
+
 }
 
 void atacar() {
@@ -553,10 +565,11 @@ int loopFase() {
         char comando = meuGetch();
 
         if (comando == 'q') return 0;
+        if (comando == 'n') { skipFase = 1; return 1; }  // ← return aqui
         else if (comando == 'i') interagir();
         else if (comando == 'o') atacar();
         else moverJogador(comando);
-        
+
         moverMonstros();//IA
 
         if (faseConcluida == 1) return 1;
@@ -604,12 +617,12 @@ void jogar() {
     while (1) {
         inicializarVila();
         int res = loopFase();
-        if (res == 0) return;                              
-        if (res == -1) {                                
+        if (res == 0) return;
+        if (res == -1) {
             if (vidas <= 0) { telaGameOver(); return; }
-            continue;                                  
+            continue;
         }
-        if (res == 1) break;                              
+        if (res == 1 || skipFase) { skipFase = 0; break; }
     }
 
     faseAtual = 1;
@@ -621,9 +634,9 @@ void jogar() {
             if (vidas <= 0) { telaGameOver(); return; }
             continue;
         }
-        if (res == 1) break;
+        if (res == 1 || skipFase) { skipFase = 0; break; }
     }
-   
+
     faseAtual = 2;
     while (1) {
         inicializarAndar2();
@@ -633,9 +646,9 @@ void jogar() {
             if (vidas <= 0) { telaGameOver(); return; }
             continue;
         }
-        if (res == 1) break;
+        if (res == 1 || skipFase) { skipFase = 0; break; }
     }
-    
+
     faseAtual = 3;
     while (1) {
         inicializarAndar3();
@@ -645,13 +658,12 @@ void jogar() {
             if (vidas <= 0) { telaGameOver(); return; }
             continue;
         }
-        if (res == 1) break;
+        if (res == 1 || skipFase) { skipFase = 0; break; }
     }
-    
+
 
     limparTela();
-    printf("\nVoce completou tudo que esta implementado ate aqui!\n");
-    printf("(Andares 2 e 3 serao adicionados nas proximas etapas)\n\n");
+    telaVitoria();
     printf("Pressione qualquer tecla para voltar ao menu...\n");
     meuGetch();
 }
@@ -680,18 +692,15 @@ void sair() {
 // ============================================================
 
 int main(void) {
-   
+
      int opcao;
      srand(time(NULL));//IA
     do {
         limparTela();
         printf("\n=== DUNGEON CRAWLER ===\n\n1. Jogar\n2. Tutorial\n3. Sair\n\nEscolha uma opcao: ");
 
-        if (scanf("%d", &opcao) != 1) {
-            opcao = 0;
-        }
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF);
+        char c = meuGetch();  // ← troca scanf por isso
+        opcao = c - '0';      // converte char pra int
 
         switch (opcao) {
             case 1: jogar(); break;
