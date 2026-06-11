@@ -1,99 +1,103 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h>
-#include <unistd.h>
+#include <time.h>
+
+// ============================================================
+// COMPATIBILIDADE WINDOWS / LINUX
+// ============================================================
+#ifdef _WIN32
+    #include <conio.h>
+    #include <windows.h>
+    char meuGetch() {
+        return _getch();
+    }
+    void limparTela() {
+        system("cls");
+    }
+#else
+    #include <termios.h>
+    #include <unistd.h>
+    char meuGetch() {
+        struct termios oldt, newt;
+        char ch;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        ch = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        return ch;
+    }
+    void limparTela() {
+        printf("\033[H\033[J");
+    }
+#endif
 
 // ============================================================
 // CONSTANTES
 // ============================================================
 
-// tamanho maximo do mapa (o 3o andar e 25x25, entao reservo esse tamanho)
+// tamanho maximo do mapa
 #define MAX_LINHAS 25
 #define MAX_COLUNAS 25
 
 // simbolos do mapa
-#define VAZIO          ' '
-#define PAREDE         '*'
-#define CHAVE          '@'
-#define CAIXA          'k'
-#define PORTA_FECHADA  'D'
-#define PORTA_ABERTA   '='
-#define ESCADA         'L'
-#define NPC            'N'
-#define ENTRADA        'E'   // entrada da masmorra na vila
-#define ESPINHO        '#'
-#define BOTAO          'O'
-#define INIMIGO_X      'X'
-#define INIMIGO_Y      'Y'
-#define BOSS           'Z'
+#define VAZIO ' '
+#define PAREDE '*'
+#define CHAVE '@'
+#define CAIXA 'k'
+#define PORTA_FECHADA 'D'
+#define PORTA_ABERTA '='
+#define ESCADA 'L'
+#define NPC 'N'
+#define ENTRADA 'E'
+#define ESPINHO '#'
+#define BOTAO 'O'
+#define INIMIGO_X 'X'
+#define INIMIGO_Y 'Y'
+#define BOSS 'Z'
 
 // armas
-#define ARMA_NENHUMA   0
-#define ARMA_ESPADA    1
-#define ARMA_ARCO      2
-#define ARMA_CAJADO    3
-
+#define ARMA_NENHUMA 0
+#define ARMA_ESPADA 1
+#define ARMA_ARCO 2
+#define ARMA_CAJADO 3
 
 // ============================================================
 // VARIAVEIS GLOBAIS
 // ============================================================
 
-// mapa: usa o tamanho maximo, mas so trabalha com linhasAtual/colunasAtual
 char mapa[MAX_LINHAS][MAX_COLUNAS];
 int linhasAtual = 10;
 int colunasAtual = 10;
 
-// jogador
 int jogadorY = 1;
 int jogadorX = 1;
 char direcaoJogador = 'v';
 
-// estado do jogo
 int vidas = 3;
 int temChave = 0;
 int armaEscolhida = ARMA_NENHUMA;
-int faseAtual = 0;      // 0 = vila, 1 = andar 1, 2 = andar 2, 3 = andar 3
-int faseConcluida = 0;  // 0 = jogando, 1 = passou de fase, -1 = morreu (reiniciar)
-
+int faseAtual = 0;      
+int faseConcluida = 0;  
 
 // ============================================================
 // UTILITARIOS
 // ============================================================
 
-// le uma tecla sem precisar de Enter (substituto do _getch do Windows)
-char meuGetch() {
-    struct termios oldt, newt;
-    char ch;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    ch = getchar();
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    return ch;
-}
-
-void limparTela() {
-    printf("\033[H\033[J");
-}
-
-// verifica se uma celula esta dentro dos limites do mapa atual
 int dentroDoMapa(int y, int x) {
     return (y >= 0 && y < linhasAtual && x >= 0 && x < colunasAtual);
 }
-
 
 // ============================================================
 // INICIALIZACAO DAS FASES
 // ============================================================
 
-// preenche o mapa com paredes nas bordas e vazio no meio
 void montarBordas() {
     for (int i = 0; i < linhasAtual; i++) {
         for (int j = 0; j < colunasAtual; j++) {
-            if (i == 0 || i == linhasAtual - 1 ||
-                j == 0 || j == colunasAtual - 1)
+            if (i == 0 || i == linhasAtual - 1 || j == 0 || j == colunasAtual - 1)
                 mapa[i][j] = PAREDE;
             else
                 mapa[i][j] = VAZIO;
@@ -106,13 +110,9 @@ void inicializarVila() {
     colunasAtual = 10;
     montarBordas();
 
-    // NPC que da a arma
     mapa[3][5] = NPC;
-
-    // entrada da masmorra
     mapa[8][8] = ENTRADA;
 
-    // jogador comeca no canto
     jogadorX = 1;
     jogadorY = 1;
     direcaoJogador = 'v';
@@ -123,25 +123,130 @@ void inicializarAndar1() {
     colunasAtual = 10;
     montarBordas();
 
-    // caixas que bloqueiam um caminho (tutorial de quebrar caixa)
     mapa[4][3] = CAIXA;
     mapa[4][4] = CAIXA;
-
-    // chave
     mapa[2][7] = CHAVE;
-
-    // porta fechada e escada logo apos (tutorial de chave + porta)
     mapa[8][1] = PORTA_FECHADA;
     mapa[8][2] = ESCADA;
 
-    // reset do estado da fase
     jogadorX = 1;
     jogadorY = 1;
     direcaoJogador = 'v';
     temChave = 0;
 }
 
+//IA agilizou
+void inicializarAndar2(){
+   
+linhasAtual = 15;
+    colunasAtual = 15;
+    montarBordas();
 
+    // Caixas
+mapa[1][13] = CAIXA;
+mapa[4][4] = CAIXA;
+mapa[7][5] = CAIXA;
+mapa[10][5] = CAIXA;
+mapa[13][11] = CAIXA;
+
+// Chaves
+mapa[3][3] = CHAVE;
+mapa[13][12] = CHAVE;
+
+// Portas fechadas
+mapa[6][6] = PORTA_FECHADA;
+mapa[6][8] = PORTA_FECHADA;
+
+// Escada
+mapa[6][13] = ESCADA;
+
+// Espinhos (todos-uso de IA para acelerar)
+mapa[4][13] = ESPINHO;
+mapa[4][12] = ESPINHO;
+mapa[4][11] = ESPINHO;
+mapa[4][10] = ESPINHO;
+mapa[4][9] = ESPINHO;
+mapa[4][8] = ESPINHO;
+mapa[4][7] = ESPINHO;
+mapa[4][6] = ESPINHO;
+
+mapa[8][13] = ESPINHO;
+mapa[8][12] = ESPINHO;
+mapa[8][11] = ESPINHO;
+mapa[8][10] = ESPINHO;
+mapa[8][9] = ESPINHO;
+mapa[8][8] = ESPINHO;
+mapa[8][7] = ESPINHO;
+mapa[8][6] = ESPINHO;
+
+mapa[5][6] = ESPINHO;
+mapa[5][7] = ESPINHO;
+mapa[5][8] = ESPINHO;
+
+mapa[7][6] = ESPINHO;
+mapa[7][7] = ESPINHO;
+mapa[7][8] = ESPINHO;
+
+//Inimigo 1- IA agilizar
+mapa[10][7] = INIMIGO_X;  
+
+    jogadorX = 1;
+    jogadorY = 1;
+    direcaoJogador = 'v';
+    temChave = 0;
+
+}
+
+void inicializarAndar3() {
+    linhasAtual = 25;
+    colunasAtual = 25;
+    montarBordas();   // preenche bordas com '*' e interior com ' '
+
+    // ===== 3 CHAVES =====
+    mapa[2][2] = CHAVE;
+    mapa[12][12] = CHAVE;
+    mapa[22][22] = CHAVE;
+
+    // ===== 3 PORTAS FECHADAS =====
+    mapa[3][22] = PORTA_FECHADA;
+    mapa[12][20] = PORTA_FECHADA;
+    mapa[22][3] = PORTA_FECHADA;
+
+    // ===== CAIXAS (obstáculos) =====
+    mapa[5][5] = CAIXA;
+    mapa[5][6] = CAIXA;
+    mapa[10][10] = CAIXA;
+    mapa[10][11] = CAIXA;
+    mapa[15][15] = CAIXA;
+    mapa[18][18] = CAIXA;
+
+    // ===== ESPINHOS =====
+    mapa[8][8] = ESPINHO;
+    mapa[8][9] = ESPINHO;
+    mapa[9][8] = ESPINHO;
+    mapa[9][9] = ESPINHO;
+    mapa[16][16] = ESPINHO;
+    mapa[16][17] = ESPINHO;
+    mapa[17][16] = ESPINHO;
+
+    // ===== BOTÃO =====
+    mapa[20][20] = BOTAO;
+
+    // ===== MONSTRO TIPO 2 (persegue jogador) =====
+    mapa[6][18] = INIMIGO_Y;
+
+    // ===== BOSS FINAL =====
+    mapa[23][23] = BOSS;
+
+    // ===== ESCADA (saída – atrás do boss) =====
+    mapa[24][24] = ESCADA;
+
+    // ===== POSIÇÃO INICIAL DO JOGADOR =====
+    jogadorX = 1;
+    jogadorY = 1;
+    direcaoJogador = 'v';
+    temChave = 0;   // começa sem chave neste andar
+}
 // ============================================================
 // IMPRESSAO
 // ============================================================
@@ -150,7 +255,7 @@ void imprimirMapa() {
     limparTela();
 
     if (faseAtual == 0) printf("--- VILA ---\n");
-    else                printf("--- ANDAR %d ---\n", faseAtual);
+    else printf("--- ANDAR %d ---\n", faseAtual);
 
     for (int i = 0; i < linhasAtual; i++) {
         for (int j = 0; j < colunasAtual; j++) {
@@ -162,29 +267,23 @@ void imprimirMapa() {
         printf("\n");
     }
 
-    // mostra nome da arma escolhida
     char nomeArma[20] = "Nenhuma";
-    if      (armaEscolhida == ARMA_ESPADA) strcpy(nomeArma, "Espada");
-    else if (armaEscolhida == ARMA_ARCO)   strcpy(nomeArma, "Arco");
+    if (armaEscolhida == ARMA_ESPADA) strcpy(nomeArma, "Espada");
+    else if (armaEscolhida == ARMA_ARCO) strcpy(nomeArma, "Arco");
     else if (armaEscolhida == ARMA_CAJADO) strcpy(nomeArma, "Cajado");
 
-    printf("Vidas: %d | Chave: %s | Arma: %s\n",
-           vidas, temChave ? "Sim" : "Nao", nomeArma);
+    printf("Vidas: %d | Chave: %s | Arma: %s\n", vidas, temChave ? "Sim" : "Nao", nomeArma);
     printf("WASD = mover | I = interagir | O = atacar | Q = sair\n");
 }
-
 
 // ============================================================
 // ATAQUE
 // ============================================================
 
-// destroi caixa ou inimigo numa celula (boss tem logica propria depois)
 void atacarCelula(int y, int x) {
     if (!dentroDoMapa(y, x)) return;
 
-    if (mapa[y][x] == CAIXA ||
-        mapa[y][x] == INIMIGO_X ||
-        mapa[y][x] == INIMIGO_Y) {
+    if (mapa[y][x] == CAIXA || mapa[y][x] == INIMIGO_X || mapa[y][x] == INIMIGO_Y) {
         mapa[y][x] = VAZIO;
     }
 }
@@ -196,21 +295,16 @@ void atacar() {
         return;
     }
 
-    // direcao para frente (depende de onde o jogador esta olhando)
     int dyF = 0, dxF = 0;
-    if      (direcaoJogador == '^') dyF = -1;
-    else if (direcaoJogador == 'v') dyF =  1;
+    if (direcaoJogador == '^') dyF = -1;
+    else if (direcaoJogador == 'v') dyF = 1;
     else if (direcaoJogador == '<') dxF = -1;
-    else if (direcaoJogador == '>') dxF =  1;
+    else if (direcaoJogador == '>') dxF = 1;
 
     if (armaEscolhida == ARMA_ESPADA) {
-        // 3x2 a frente: 3 de largura, 2 de profundidade
-        // perpendicular para criar a "largura":
-        //   se olha para cima/baixo, a largura e horizontal (dx)
-        //   se olha para esquerda/direita, a largura e vertical (dy)
         int dyP = 0, dxP = 0;
         if (direcaoJogador == '^' || direcaoJogador == 'v') dxP = 1;
-        else                                                 dyP = 1;
+        else dyP = 1;
 
         for (int prof = 1; prof <= 2; prof++) {
             int cy = jogadorY + dyF * prof;
@@ -221,13 +315,11 @@ void atacar() {
         }
     }
     else if (armaEscolhida == ARMA_ARCO) {
-        // 4 celulas em linha reta a frente
         for (int p = 1; p <= 4; p++) {
             atacarCelula(jogadorY + dyF * p, jogadorX + dxF * p);
         }
     }
     else if (armaEscolhida == ARMA_CAJADO) {
-        // todas as 8 celulas adjacentes (independente da direcao)
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 if (dy == 0 && dx == 0) continue;
@@ -236,7 +328,6 @@ void atacar() {
         }
     }
 }
-
 
 // ============================================================
 // INTERACAO (tecla I)
@@ -247,12 +338,12 @@ void escolherArma() {
     printf("--- NPC ---\n\n");
     printf("Bem-vindo, viajante. Escolha sua arma:\n\n");
     printf("1. Espada - ataca area 3x2 a sua frente\n");
-    printf("2. Arco   - atinge 4 celulas em linha reta\n");
+    printf("2. Arco - atinge 4 celulas em linha reta\n");
     printf("3. Cajado - atinge as 8 celulas ao redor\n\n");
     printf("Pressione 1, 2 ou 3: ");
 
     char c = meuGetch();
-    if      (c == '1') armaEscolhida = ARMA_ESPADA;
+    if (c == '1') armaEscolhida = ARMA_ESPADA;
     else if (c == '2') armaEscolhida = ARMA_ARCO;
     else if (c == '3') armaEscolhida = ARMA_CAJADO;
     else {
@@ -262,12 +353,11 @@ void escolherArma() {
 }
 
 void interagir() {
-    // celula a frente do jogador
     int dyF = 0, dxF = 0;
-    if      (direcaoJogador == '^') dyF = -1;
-    else if (direcaoJogador == 'v') dyF =  1;
+    if (direcaoJogador == '^') dyF = -1;
+    else if (direcaoJogador == 'v') dyF = 1;
     else if (direcaoJogador == '<') dxF = -1;
-    else if (direcaoJogador == '>') dxF =  1;
+    else if (direcaoJogador == '>') dxF = 1;
 
     int fy = jogadorY + dyF;
     int fx = jogadorX + dxF;
@@ -298,11 +388,7 @@ void interagir() {
             meuGetch();
         }
     }
-    else {
-        // nada interagivel a frente
-    }
 }
-
 
 // ============================================================
 // MOVIMENTO
@@ -313,9 +399,9 @@ void moverJogador(char comando) {
 
     switch (comando) {
         case 'w': dy = -1; direcaoJogador = '^'; break;
-        case 's': dy =  1; direcaoJogador = 'v'; break;
+        case 's': dy = 1; direcaoJogador = 'v'; break;
         case 'a': dx = -1; direcaoJogador = '<'; break;
-        case 'd': dx =  1; direcaoJogador = '>'; break;
+        case 'd': dx = 1; direcaoJogador = '>'; break;
         default: return;
     }
 
@@ -326,27 +412,21 @@ void moverJogador(char comando) {
 
     char alvo = mapa[novoY][novoX];
 
-    // bloqueia movimento atraves de coisas solidas
-    if (alvo == PAREDE || alvo == CAIXA || alvo == PORTA_FECHADA ||
-        alvo == NPC    || alvo == ENTRADA)
+    if (alvo == PAREDE || alvo == CAIXA || alvo == PORTA_FECHADA || alvo == NPC || alvo == ENTRADA)
         return;
 
-    // movimento permitido
     jogadorX = novoX;
     jogadorY = novoY;
 
-    // pegou chave
     if (mapa[jogadorY][jogadorX] == CHAVE) {
         temChave = 1;
         mapa[jogadorY][jogadorX] = VAZIO;
         printf("\nVoce pegou a chave!\n");
         meuGetch();
     }
-    // pisou na escada -> avanca de fase
     else if (mapa[jogadorY][jogadorX] == ESCADA) {
         faseConcluida = 1;
     }
-    // pisou em espinho -> perde vida e reinicia a fase
     else if (mapa[jogadorY][jogadorX] == ESPINHO) {
         vidas--;
         printf("\nVoce pisou em um espinho! Vidas restantes: %d\n", vidas);
@@ -355,32 +435,63 @@ void moverJogador(char comando) {
     }
 }
 
+//IA-idealizou e criou
+void moverMonstros() {
+    // Vamos percorrer todo o mapa procurando o 'X'
+    for (int i = 0; i < linhasAtual; i++) {
+        for (int j = 0; j < colunasAtual; j++) {
+            if (mapa[i][j] == INIMIGO_X) {
+                // Sorteia direção: 0=cima, 1=baixo, 2=esquerda, 3=direita
+                int dir = rand() % 4;
+                int novoi = i, novoj = j;
+                if (dir == 0) novoi--; // cima
+                else if (dir == 1) novoi++; // baixo
+                else if (dir == 2) novoj--; // esquerda
+                else novoj++; // direita
+
+                // Verifica se a nova posição está dentro do mapa
+                if (novoi >= 0 && novoi < linhasAtual && novoj >= 0 && novoj < colunasAtual) {
+                    // Se o monstro vai para cima do jogador, aplica dano e não move
+                    if (novoi == jogadorY && novoj == jogadorX) {
+                        vidas--;
+                        faseConcluida = -1;
+                        return; // sai da função, fim do turno
+                    }
+                    // Se a nova posição estiver vazia, move
+                    if (mapa[novoi][novoj] == VAZIO) {
+                        mapa[novoi][novoj] = INIMIGO_X;
+                        mapa[i][j] = VAZIO;
+                    }
+                }
+            }
+        }
+    }
+}
 
 // ============================================================
 // LOOP DE UMA FASE
-// retornos: 0 = saiu (Q), 1 = concluida, -1 = morreu (reiniciar)
 // ============================================================
 
 int loopFase() {
     faseConcluida = 0;
-
     while (1) {
         imprimirMapa();
         fflush(stdout);
 
         char comando = meuGetch();
 
-        if      (comando == 'q') return 0;
+        if (comando == 'q') return 0;
         else if (comando == 'i') interagir();
         else if (comando == 'o') atacar();
-        else                     moverJogador(comando);
+        else moverJogador(comando);
+        
+        moverMonstros();//IA
 
-        if (faseConcluida == 1)  return 1;
+        if (faseConcluida == 1) return 1;
         if (faseConcluida == -1) return -1;
-        if (vidas <= 0)          return -1;
+        if (vidas <= 0) return -1;
     }
 }
-
 
 // ============================================================
 // TELAS DE FIM
@@ -389,9 +500,9 @@ int loopFase() {
 void telaGameOver() {
     limparTela();
     printf("\n");
-    printf("  *************************\n");
-    printf("  *    G A M E  O V E R    *\n");
-    printf("  *************************\n\n");
+    printf(" *************************\n");
+    printf(" * G A M E O V E R *\n");
+    printf(" *************************\n\n");
     printf("Voce perdeu todas as suas vidas.\n\n");
     printf("Pressione qualquer tecla para voltar ao menu...\n");
     meuGetch();
@@ -400,61 +511,78 @@ void telaGameOver() {
 void telaVitoria() {
     limparTela();
     printf("\n");
-    printf("  *************************\n");
-    printf("  *      V I T O R I A      *\n");
-    printf("  *************************\n\n");
+    printf(" *************************\n");
+    printf(" * V I T O R I A *\n");
+    printf(" *************************\n\n");
     printf("Voce derrotou o Boss e salvou a vila!\n\n");
     printf("Pressione qualquer tecla para voltar ao menu...\n");
     meuGetch();
 }
-
 
 // ============================================================
 // FLUXO PRINCIPAL DO JOGO
 // ============================================================
 
 void jogar() {
-    // reset geral da partida
     vidas = 3;
     armaEscolhida = ARMA_NENHUMA;
     temChave = 0;
 
-    // ===== VILA =====
     faseAtual = 0;
     while (1) {
         inicializarVila();
         int res = loopFase();
-        if (res == 0)  return;                          // saiu pro menu
-        if (res == -1) {                                // morreu
+        if (res == 0) return;                              
+        if (res == -1) {                                
             if (vidas <= 0) { telaGameOver(); return; }
-            continue;                                   // reinicia a vila
+            continue;                                  
         }
-        if (res == 1)  break;                           // passou de fase
+        if (res == 1) break;                              
     }
 
-    // ===== ANDAR 1 =====
     faseAtual = 1;
     while (1) {
         inicializarAndar1();
         int res = loopFase();
-        if (res == 0)  return;
+        if (res == 0) return;
         if (res == -1) {
             if (vidas <= 0) { telaGameOver(); return; }
             continue;
         }
-        if (res == 1)  break;
+        if (res == 1) break;
     }
+   
+    faseAtual = 2;
+    while (1) {
+        inicializarAndar2();
+        int res = loopFase();
+        if (res == 0) return;
+        if (res == -1) {
+            if (vidas <= 0) { telaGameOver(); return; }
+            continue;
+        }
+        if (res == 1) break;
+    }
+    
+    faseAtual = 3;
+    while (1) {
+        inicializarAndar3();
+        int res = loopFase();
+        if (res == 0) return;
+        if (res == -1) {
+            if (vidas <= 0) { telaGameOver(); return; }
+            continue;
+        }
+        if (res == 1) break;
+    }
+    
 
-    // ===== ANDAR 2 e ANDAR 3 entram aqui nas proximas etapas =====
-
-    // mensagem temporaria enquanto os outros andares nao estao prontos
     limparTela();
     printf("\nVoce completou tudo que esta implementado ate aqui!\n");
     printf("(Andares 2 e 3 serao adicionados nas proximas etapas)\n\n");
     printf("Pressione qualquer tecla para voltar ao menu...\n");
     meuGetch();
 }
-
 
 // ============================================================
 // TUTORIAL E SAIR
@@ -463,65 +591,33 @@ void jogar() {
 void tutorial() {
     limparTela();
     printf("=== TUTORIAL ===\n\n");
-
-    printf("HISTORIA:\n");
-    printf("Voce e um aventureiro que chegou em uma vila a beira de uma masmorra.\n");
+    printf("HISTORIA:\nVoce e um aventureiro que chegou em uma vila a beira de uma masmorra.\n");
     printf("Escolha sua arma com o NPC e desca os 3 andares para derrotar o Boss!\n\n");
-
-    printf("CONTROLES:\n");
-    printf("  W A S D = mover\n");
-    printf("  I       = interagir com o que esta a frente\n");
-    printf("  O       = atacar\n");
-    printf("  Q       = sair para o menu\n\n");
-
-    printf("SIMBOLOS:\n");
-    printf("  ^ v < > voce (a direcao que esta olhando)\n");
-    printf("  *       parede\n");
-    printf("  k       caixa (destrua com ataque)\n");
-    printf("  @       chave\n");
-    printf("  D       porta fechada\n");
-    printf("  =       porta aberta\n");
-    printf("  L       escada (avanca de fase)\n");
-    printf("  N       NPC (interaja para escolher arma)\n");
-    printf("  E       entrada da masmorra\n");
-    printf("  #       espinho (perde 1 vida)\n");
-    printf("  O       botao\n");
-    printf("  X       monstro tipo 1 (movimento aleatorio)\n");
-    printf("  Y       monstro tipo 2 (persegue o jogador)\n");
-    printf("  Z       boss final\n\n");
-
+    printf("CONTROLES:\n W A S D = mover\n I = interagir\n O = atacar\n Q = sair\n\n");
     printf("Pressione qualquer tecla para voltar...\n");
     meuGetch();
 }
 
 void sair() {
     limparTela();
-    printf("=== CREDITOS ===\n\n");
-    printf("Desenvolvido por: [SEU NOME AQUI]\n");
-    printf("CESUPA - 2026\n\n");
-    printf("Obrigado por jogar!\n\n");
+    printf("=== CREDITOS ===\n\nDesenvolvido por: [SEU NOME AQUI]\nCESUPA - 2026\nObrigado por jogar!\n\n");
 }
-
 
 // ============================================================
 // MAIN
 // ============================================================
 
 int main(void) {
-    int opcao;
-
+   
+     int opcao;
+     srand(time(NULL));//IA
     do {
         limparTela();
-        printf("\n=== DUNGEON CRAWLER ===\n\n");
-        printf("1. Jogar\n");
-        printf("2. Tutorial\n");
-        printf("3. Sair\n\n");
-        printf("Escolha uma opcao: ");
+        printf("\n=== DUNGEON CRAWLER ===\n\n1. Jogar\n2. Tutorial\n3. Sair\n\nEscolha uma opcao: ");
 
         if (scanf("%d", &opcao) != 1) {
             opcao = 0;
         }
-        // consome o \n que sobra do scanf (senao bagunca o meuGetch depois)
         int c;
         while ((c = getchar()) != '\n' && c != EOF);
 
@@ -534,6 +630,5 @@ int main(void) {
                 meuGetch();
         }
     } while (opcao != 3);
-
     return 0;
 }
