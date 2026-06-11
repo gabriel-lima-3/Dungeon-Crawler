@@ -437,7 +437,7 @@ void moverJogador(char comando) {
 
 //IA-idealizou e criou
 void moverMonstros() {
-    // Vamos percorrer todo o mapa procurando o 'X'
+
     for (int i = 0; i < linhasAtual; i++) {
         for (int j = 0; j < colunasAtual; j++) {
             if (mapa[i][j] == INIMIGO_X) {
@@ -484,7 +484,7 @@ int loopFase() {
         else if (comando == 'i') interagir();
         else if (comando == 'o') atacar();
         else moverJogador(comando);
-        
+
         moverMonstros();//IA
 
         if (faseConcluida == 1) return 1;
@@ -532,12 +532,12 @@ void jogar() {
     while (1) {
         inicializarVila();
         int res = loopFase();
-        if (res == 0) return;                              
-        if (res == -1) {                                
+        if (res == 0) return;
+        if (res == -1) {
             if (vidas <= 0) { telaGameOver(); return; }
-            continue;                                  
+            continue;
         }
-        if (res == 1) break;                              
+        if (res == 1) break;
     }
 
     faseAtual = 1;
@@ -551,7 +551,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-   
+
     faseAtual = 2;
     while (1) {
         inicializarAndar2();
@@ -563,7 +563,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-    
+
     faseAtual = 3;
     while (1) {
         inicializarAndar3();
@@ -575,7 +575,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-    
+
 
     limparTela();
     printf("\nVoce completou tudo que esta implementado ate aqui!\n");
@@ -600,7 +600,7 @@ void tutorial() {
 
 void sair() {
     limparTela();
-    printf("=== CREDITOS ===\n\nDesenvolvido por: [SEU NOME AQUI]\nCESUPA - 2026\nObrigado por jogar!\n\n");
+    printf("=== CREDITOS ===\n\nDesenvolvido por: Gabriel Lima, Diego Viana\nCESUPA - 2026\nObrigado por jogar!\n\n");
 }
 
 // ============================================================
@@ -608,7 +608,7 @@ void sair() {
 // ============================================================
 
 int main(void) {
-   
+
      int opcao;
      srand(time(NULL));//IA
     do {
