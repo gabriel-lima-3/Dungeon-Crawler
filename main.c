@@ -157,6 +157,9 @@ mapa[13][12] = CHAVE;
 mapa[6][6] = PORTA_FECHADA;
 mapa[6][8] = PORTA_FECHADA;
 
+//Botão
+mapa[13][7] = BOTAO;
+
 // Escada
 mapa[6][13] = ESCADA;
 
@@ -286,6 +289,12 @@ void atacarCelula(int y, int x) {
     if (mapa[y][x] == CAIXA || mapa[y][x] == INIMIGO_X || mapa[y][x] == INIMIGO_Y) {
         mapa[y][x] = VAZIO;
     }
+    
+    //IA
+    if (mapa[y][x] == CAIXA || mapa[y][x] == INIMIGO_X || mapa[y][x] == INIMIGO_Y || mapa[y][x] == BOSS) {
+    mapa[y][x] = VAZIO;
+}
+    
 }
 
 void atacar() {
@@ -329,6 +338,12 @@ void atacar() {
     }
 }
 
+
+
+
+
+
+
 // ============================================================
 // INTERACAO (tecla I)
 // ============================================================
@@ -349,6 +364,20 @@ void escolherArma() {
     else {
         printf("\nEscolha invalida.\n");
         meuGetch();
+    }
+}
+
+void acionarBotao(int y, int x) {
+    // Percorre as 8 direções ao redor do botão (inclui diagonais)
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dy == 0 && dx == 0) continue; // ignora a posição do botão
+            int ny = y + dy;
+            int nx = x + dx;
+            if (dentroDoMapa(ny, nx) && mapa[ny][nx] == VAZIO) {
+                mapa[ny][nx] = CAIXA;   // coloca uma caixa
+            }
+        }
     }
 }
 
@@ -387,6 +416,11 @@ void interagir() {
             printf("\nA porta esta trancada. Procure uma chave.\n");
             meuGetch();
         }
+    }else if (alvo == BOTAO) {
+        acionarBotao(fy, fx);
+        mapa[fy][fx] = VAZIO;          // botão desaparece (opcional)
+        printf("\n🔘 Botão ativado! Caixas surgiram ao redor!\n");
+        meuGetch();
     }
 }
 
@@ -437,29 +471,67 @@ void moverJogador(char comando) {
 
 //IA-idealizou e criou
 void moverMonstros() {
-
     for (int i = 0; i < linhasAtual; i++) {
         for (int j = 0; j < colunasAtual; j++) {
+            // ===== MONSTRO X (movimento aleatório) =====
             if (mapa[i][j] == INIMIGO_X) {
-                // Sorteia direção: 0=cima, 1=baixo, 2=esquerda, 3=direita
                 int dir = rand() % 4;
-                int novoi = i, novoj = j;
-                if (dir == 0) novoi--; // cima
-                else if (dir == 1) novoi++; // baixo
-                else if (dir == 2) novoj--; // esquerda
-                else novoj++; // direita
-
-                // Verifica se a nova posição está dentro do mapa
-                if (novoi >= 0 && novoi < linhasAtual && novoj >= 0 && novoj < colunasAtual) {
-                    // Se o monstro vai para cima do jogador, aplica dano e não move
-                    if (novoi == jogadorY && novoj == jogadorX) {
+                int ny = i, nx = j;
+                if (dir == 0) ny--;
+                else if (dir == 1) ny++;
+                else if (dir == 2) nx--;
+                else nx++;
+                if (ny >= 0 && ny < linhasAtual && nx >= 0 && nx < colunasAtual) {
+                    if (ny == jogadorY && nx == jogadorX) {
                         vidas--;
                         faseConcluida = -1;
-                        return; // sai da função, fim do turno
+                        return;
                     }
-                    // Se a nova posição estiver vazia, move
-                    if (mapa[novoi][novoj] == VAZIO) {
-                        mapa[novoi][novoj] = INIMIGO_X;
+                    if (mapa[ny][nx] == VAZIO) {
+                        mapa[ny][nx] = INIMIGO_X;
+                        mapa[i][j] = VAZIO;
+                    }
+                }
+            }
+            // ===== MONSTRO Y (persegue jogador) =====
+            else if (mapa[i][j] == INIMIGO_Y) {
+                int dy = 0, dx = 0;
+                // Prioriza movimento vertical ou horizontal que reduza a distância
+                if (i < jogadorY) dy = 1;      // jogador está abaixo
+                else if (i > jogadorY) dy = -1; // jogador está acima
+                else if (j < jogadorX) dx = 1;  // jogador está à direita
+                else if (j > jogadorX) dx = -1; // jogador está à esquerda
+                int ny = i + dy;
+                int nx = j + dx;
+                if (ny >= 0 && ny < linhasAtual && nx >= 0 && nx < colunasAtual) {
+                    if (ny == jogadorY && nx == jogadorX) {
+                        vidas--;
+                        faseConcluida = -1;
+                        return;
+                    }
+                    if (mapa[ny][nx] == VAZIO) {
+                        mapa[ny][nx] = INIMIGO_Y;
+                        mapa[i][j] = VAZIO;
+                    }
+                }
+            }
+            // ===== BOSS Z (mesmo comportamento do Y, ou personalizado) =====
+            else if (mapa[i][j] == BOSS) {
+                int dy = 0, dx = 0;
+                if (i < jogadorY) dy = 1;
+                else if (i > jogadorY) dy = -1;
+                else if (j < jogadorX) dx = 1;
+                else if (j > jogadorX) dx = -1;
+                int ny = i + dy;
+                int nx = j + dx;
+                if (ny >= 0 && ny < linhasAtual && nx >= 0 && nx < colunasAtual) {
+                    if (ny == jogadorY && nx == jogadorX) {
+                        vidas--;
+                        faseConcluida = -1;
+                        return;
+                    }
+                    if (mapa[ny][nx] == VAZIO) {
+                        mapa[ny][nx] = BOSS;
                         mapa[i][j] = VAZIO;
                     }
                 }
@@ -484,7 +556,7 @@ int loopFase() {
         else if (comando == 'i') interagir();
         else if (comando == 'o') atacar();
         else moverJogador(comando);
-
+        
         moverMonstros();//IA
 
         if (faseConcluida == 1) return 1;
@@ -532,12 +604,12 @@ void jogar() {
     while (1) {
         inicializarVila();
         int res = loopFase();
-        if (res == 0) return;
-        if (res == -1) {
+        if (res == 0) return;                              
+        if (res == -1) {                                
             if (vidas <= 0) { telaGameOver(); return; }
-            continue;
+            continue;                                  
         }
-        if (res == 1) break;
+        if (res == 1) break;                              
     }
 
     faseAtual = 1;
@@ -551,7 +623,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-
+   
     faseAtual = 2;
     while (1) {
         inicializarAndar2();
@@ -563,7 +635,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-
+    
     faseAtual = 3;
     while (1) {
         inicializarAndar3();
@@ -575,7 +647,7 @@ void jogar() {
         }
         if (res == 1) break;
     }
-
+    
 
     limparTela();
     printf("\nVoce completou tudo que esta implementado ate aqui!\n");
@@ -600,7 +672,7 @@ void tutorial() {
 
 void sair() {
     limparTela();
-    printf("=== CREDITOS ===\n\nDesenvolvido por: Gabriel Lima, Diego Viana\nCESUPA - 2026\nObrigado por jogar!\n\n");
+    printf("=== CREDITOS ===\n\nDesenvolvido por: [SEU NOME AQUI]\nCESUPA - 2026\nObrigado por jogar!\n\n");
 }
 
 // ============================================================
@@ -608,7 +680,7 @@ void sair() {
 // ============================================================
 
 int main(void) {
-
+   
      int opcao;
      srand(time(NULL));//IA
     do {
