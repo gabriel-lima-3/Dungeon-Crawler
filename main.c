@@ -672,7 +672,7 @@ void tutorial() {
 
 void sair() {
     limparTela();
-    printf("=== CREDITOS ===\n\nDesenvolvido por: [SEU NOME AQUI]\nCESUPA - 2026\nObrigado por jogar!\n\n");
+    printf("=== CREDITOS ===\n\nDesenvolvido por: Gabriel Lima, Diego Viana \nCESUPA - 2026\nObrigado por jogar!\n\n");
 }
 
 // ============================================================
