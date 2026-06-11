@@ -254,7 +254,7 @@ void inicializarAndar3() {
     mapa[23][23] = BOSS;
 
     // ===== ESCADA (saída – atrás do boss) =====
-    mapa[24][24] = ESCADA;
+    mapa[12][23] = ESCADA;
 
     // ===== POSIÇÃO INICIAL DO JOGADOR =====
     jogadorX = 1;
