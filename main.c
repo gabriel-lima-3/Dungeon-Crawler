@@ -223,9 +223,9 @@ void inicializarAndar3() {
     mapa[22][22] = CHAVE;
 
     // ===== 3 PORTAS FECHADAS =====
-    mapa[3][22] = PORTA_FECHADA;
-    mapa[12][20] = PORTA_FECHADA;
-    mapa[22][3] = PORTA_FECHADA;
+    mapa[6][6] = PORTA_FECHADA;
+    mapa[6][7] = PORTA_FECHADA;
+    mapa[6][8] = PORTA_FECHADA;
 
     // ===== CAIXAS (obstáculos) =====
     mapa[5][5] = CAIXA;
@@ -244,6 +244,44 @@ void inicializarAndar3() {
     mapa[16][17] = ESPINHO;
     mapa[17][16] = ESPINHO;
 
+// Escada
+mapa[6][12] = ESCADA;
+
+// Espinhos (todos-uso de IA para acelerar)
+mapa[4][13] = ESPINHO;
+mapa[4][12] = ESPINHO;
+mapa[4][11] = ESPINHO;
+mapa[4][10] = ESPINHO;
+mapa[4][9] = ESPINHO;
+mapa[4][8] = ESPINHO;
+mapa[4][7] = ESPINHO;
+mapa[4][6] = ESPINHO;
+
+mapa[8][13] = ESPINHO;
+mapa[8][12] = ESPINHO;
+mapa[8][11] = ESPINHO;
+mapa[8][10] = ESPINHO;
+mapa[8][9] = ESPINHO;
+mapa[8][8] = ESPINHO;
+mapa[8][7] = ESPINHO;
+mapa[8][6] = ESPINHO;
+
+mapa[5][6] = ESPINHO;
+mapa[5][7] = ESPINHO;
+mapa[5][8] = ESPINHO;
+
+mapa[7][6] = ESPINHO;
+mapa[7][7] = ESPINHO;
+mapa[7][8] = ESPINHO;
+
+mapa[8][13] = ESPINHO;
+mapa[7][13] = ESPINHO;
+mapa[6][13] = ESPINHO;
+mapa[5][13] = ESPINHO;
+mapa[4][13] = ESPINHO;
+
+
+
     // ===== BOTÃO =====
     mapa[20][20] = BOTAO;
 
@@ -253,8 +291,6 @@ void inicializarAndar3() {
     // ===== BOSS FINAL =====
     mapa[23][23] = BOSS;
 
-    // ===== ESCADA (saída – atrás do boss) =====
-    mapa[12][23] = ESCADA;
 
     // ===== POSIÇÃO INICIAL DO JOGADOR =====
     jogadorX = 1;
